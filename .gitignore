@@ -1,0 +1,25 @@
+# Local agent instructions (contain internal deploy paths)
+/AGENTS.md
+
+# Internal documentation and local notes
+/docs-internal/
+docs/*-local.md
+
+# Secrets and local configuration
+/secrets.env
+secrets.env
+opencode.json
+
+# Build output (created by the Pages workflow)
+/_site/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
