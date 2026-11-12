@@ -25,7 +25,7 @@ dependencies, plain HTML/CSS/JavaScript.
 
 The hole starts at tile 10 (files c–d, ranks 3–4). See
 [`docs/sliding-tile-chess.md`](docs/sliding-tile-chess.md) for the full rules,
-the decision log and implementation notes.
+the design decisions and implementation notes.
 
 ## Features
 
@@ -65,7 +65,7 @@ python3 -m http.server 8000
 | `index.html` | Entry point, canvas and overlay |
 | `style.css` | Layout and overlay styling |
 | `game.js` | Game logic, rules, AI, rendering and input (single IIFE) |
-| `docs/sliding-tile-chess.md` | Rules, decision log and implementation notes |
+| `docs/sliding-tile-chess.md` | Rules, design decisions and implementation notes |
 | `.github/workflows/deploy.yml` | Deploys the game to GitHub Pages on every push to `main` |
 
 ## Deployment
