@@ -44,8 +44,10 @@ the design decisions and implementation notes.
 | Click/tap a piece | Select it; legal moves are highlighted |
 | Click/tap a target square | Make the move |
 | Click an arrow next to the hole | Slide the adjacent tile into the hole |
+| "Zurück" / Backspace | Undo the last action; in computer mode, undo the computer's reply and your move together |
 | "Neues Spiel" | Restart the current mode |
 | "Menü" | Return to the mode menu |
+| Escape / "Schließen" | Close the end-of-game dialog and inspect the final board |
 
 The game UI is in German.
 

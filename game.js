@@ -38,8 +38,10 @@
   let pendingPromotion = null;
   let pendingSlidePromotion = null;
   let gameOver = false;
+  let resultVisible = false;
   let statusText = "";
   let moveLog = [];
+  let undoStack = [];
   let positionCounts = new Map();
   let computerThinking = false;
   let buttons = [];
@@ -464,6 +466,36 @@
     st.hole = undo.hole;
   }
 
+  function cloneState(st) {
+    return {
+      board: st.board.slice(),
+      turn: st.turn,
+      castling: { ...st.castling },
+      ep: st.ep,
+      halfmove: st.halfmove,
+      fullmove: st.fullmove,
+      hole: st.hole,
+      history: [],
+    };
+  }
+
+  function cloneMove(move) {
+    if (!move) return null;
+    const copy = { ...move };
+    if (move.promotions) copy.promotions = move.promotions.map((p) => ({ ...p }));
+    return copy;
+  }
+
+  function captureUndo(actor) {
+    return {
+      state: cloneState(state),
+      moveLog: moveLog.slice(),
+      positionCounts: new Map(positionCounts),
+      lastMove: cloneMove(lastMove),
+      actor,
+    };
+  }
+
   // ---------- game status ----------
 
   function positionKey(st) {
@@ -556,8 +588,10 @@
     pendingPromotion = null;
     pendingSlidePromotion = null;
     gameOver = false;
+    resultVisible = false;
     statusText = "";
     moveLog = [];
+    undoStack = [];
     computerThinking = false;
     hoveredArrow = null;
     positionCounts = new Map();
@@ -569,6 +603,7 @@
 
   function showMenu() {
     gameOver = true;
+    resultVisible = false;
     overlayContent.innerHTML =
       "<h1>Pl\u00e4ttchen-Schach</h1>" +
       "<p>Schach mit 2\u00d72-Pl\u00e4ttchen und einem Loch.</p>" +
@@ -581,14 +616,22 @@
   }
 
   function showResult(title, text) {
+    resultVisible = true;
     overlayContent.innerHTML =
       "<h1>" + title + "</h1>" +
       "<p>" + text + "</p>" +
       '<div class="buttons">' +
       '<button data-action="again">Nochmal</button>' +
+      '<button data-action="close" class="secondary">Schlie\u00dfen</button>' +
       '<button data-action="menu" class="secondary">Men\u00fc</button>' +
       "</div>";
     overlay.classList.add("visible");
+  }
+
+  function closeResult() {
+    resultVisible = false;
+    overlay.classList.remove("visible");
+    render();
   }
 
   function humanCanAct() {
@@ -600,6 +643,8 @@
 
   function applyMove(move) {
     const label = moveLabel(move);
+    const actor = mode === "computer" && state.turn === computerColor ? "computer" : "human";
+    undoStack.push(captureUndo(actor));
     makeMove(state, move);
     moveLog.push(label);
     lastMove = move;
@@ -613,6 +658,43 @@
     updateStatus();
     render();
     if (!gameOver && mode === "computer" && state.turn === computerColor) scheduleComputer();
+  }
+
+  function undoOne() {
+    const snap = undoStack.pop();
+    if (!snap) return false;
+    gameToken++;
+    state = cloneState(snap.state);
+    moveLog = snap.moveLog;
+    positionCounts = new Map(snap.positionCounts);
+    lastMove = snap.lastMove;
+    selected = null;
+    legalTargets = [];
+    pendingPromotion = null;
+    pendingSlidePromotion = null;
+    computerThinking = false;
+    hoveredArrow = null;
+    canvas.style.cursor = "default";
+    resultVisible = false;
+    overlay.classList.remove("visible");
+    gameOver = false;
+    refreshLegal();
+    updateStatus();
+    render();
+    return true;
+  }
+
+  function undoMove() {
+    if (pendingPromotion || pendingSlidePromotion) return;
+    if (!undoStack.length) return;
+    const top = undoStack[undoStack.length - 1];
+    if (mode === "computer" && top.actor === "computer") {
+      undoOne();
+      const next = undoStack[undoStack.length - 1];
+      if (next && next.actor === "human") undoOne();
+    } else {
+      undoOne();
+    }
   }
 
   function requestSlide(slide) {
@@ -1008,13 +1090,22 @@
     buttons = [
       { x: PANEL_X + 16, y: PANEL_Y + 420, w: PANEL_W - 32, h: 42, label: "Neues Spiel", action: "restart" },
       { x: PANEL_X + 16, y: PANEL_Y + 472, w: PANEL_W - 32, h: 42, label: "Men\u00fc", action: "menu" },
+      { x: PANEL_X + 16, y: PANEL_Y + 522, w: PANEL_W - 32, h: 32, label: "\u2190 Zur\u00fcck", action: "undo", subtle: true },
     ];
     for (const b of buttons) {
-      ctx.fillStyle = b.action === "menu" ? "#30363d" : "#1f6feb";
-      roundRect(b.x, b.y, b.w, b.h, 10);
-      ctx.fill();
-      ctx.fillStyle = "#e6edf3";
-      ctx.font = "bold 14px system-ui";
+      roundRect(b.x, b.y, b.w, b.h, b.subtle ? 8 : 10);
+      if (b.subtle) {
+        ctx.fillStyle = "#21262d";
+        ctx.fill();
+        ctx.strokeStyle = "#30363d";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = b.action === "menu" ? "#30363d" : "#1f6feb";
+        ctx.fill();
+      }
+      ctx.fillStyle = b.subtle ? (undoStack.length ? "#adbac7" : "#484f58") : "#e6edf3";
+      ctx.font = b.subtle ? "13px system-ui" : "bold 14px system-ui";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
@@ -1085,6 +1176,7 @@
   function handleButton(action) {
     if (action === "restart") startGame(mode);
     else if (action === "menu") showMenu();
+    else if (action === "undo") undoMove();
   }
 
   function handleBoardClick(p) {
@@ -1190,7 +1282,24 @@
     if (!btn) return;
     if (btn.dataset.mode) startGame(btn.dataset.mode);
     else if (btn.dataset.action === "again") startGame(mode);
+    else if (btn.dataset.action === "close") closeResult();
     else if (btn.dataset.action === "menu") showMenu();
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (resultVisible && overlay.classList.contains("visible")) {
+        event.preventDefault();
+        closeResult();
+      }
+      return;
+    }
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      if (overlay.classList.contains("visible")) return;
+      if (pendingPromotion || pendingSlidePromotion) return;
+      undoMove();
+    }
   });
 
   // ---------- init ----------
